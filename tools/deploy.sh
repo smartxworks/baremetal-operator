@@ -100,6 +100,11 @@ if [[ "${DEPLOY_MARIADB}" == "true" ]] && [[ "${DEPLOY_TLS}" == "false" ]]; then
     exit 1
 fi
 
+if [ -z "${IRONIC_HOST_IP}" ];then
+    echo "ERROR: must set IRONIC_HOST_IP var"
+    exit 1
+fi
+
 MARIADB_HOST_IP="${MARIADB_HOST_IP:-"127.0.0.1"}"
 KUBECTL_ARGS="${KUBECTL_ARGS:-""}"
 RESTART_CONTAINER_CERTIFICATE_UPDATED=${RESTART_CONTAINER_CERTIFICATE_UPDATED:-"false"}
@@ -221,9 +226,9 @@ if [[ "${DEPLOY_BMO}" == "true" ]]; then
     # shellcheck disable=SC2086
     echo "generate bmo ..."
     if [ "${GENERATE_YAML}" == true ];then
-        ${KUSTOMIZE} build "${BMO_SCENARIO}" > "${SCRIPTDIR}/manifests.yaml"
+        ${KUSTOMIZE} build "${BMO_SCENARIO}" | sed "s/172.22.0.2/${IRONIC_HOST_IP}/g" > "${SCRIPTDIR}/manifests.yaml"
     else
-        ${KUSTOMIZE} build "${BMO_SCENARIO}" | kubectl apply ${KUBECTL_ARGS} -f -
+        ${KUSTOMIZE} build "${BMO_SCENARIO}" | sed "s/172.22.0.2/${IRONIC_HOST_IP}/g" | kubectl apply ${KUBECTL_ARGS} -f -
     fi
     popd
 fi
@@ -249,6 +254,17 @@ if [[ "${DEPLOY_IRONIC}" == "true" ]]; then
     else
         echo "RESTART_CONTAINER_CERTIFICATE_UPDATED=${RESTART_CONTAINER_CERTIFICATE_UPDATED}" >> "${IRONIC_BMO_CONFIGMAP}"
     fi
+
+    sed -ie "s/172.22.0.2/${IRONIC_HOST_IP}/g" "${IRONIC_BMO_CONFIGMAP}"
+
+    if [ -n "${PROVISIONING_INTERFACE}" ];then
+        sed -ie "s/PROVISIONING_INTERFACE=.*/PROVISIONING_INTERFACE=${PROVISIONING_INTERFACE}/g" "${IRONIC_BMO_CONFIGMAP}"
+    fi
+
+    if [ -n "${CACHEURL}" ];then
+        sed -ie "s|CACHEURL=.*|CACHEURL=${CACHEURL}|g" "${IRONIC_BMO_CONFIGMAP}"
+    fi
+
     sed -ie "s/IRONIC_HOST_IP/${IRONIC_HOST_IP}/g" "${SCRIPTDIR}/ironic-deployment/components/tls/certificate.yaml"
     sed -ie "s/MARIADB_HOST_IP/${MARIADB_HOST_IP}/g" "${SCRIPTDIR}/ironic-deployment/components/mariadb/certificate.yaml"
     # The keepalived component has its own configmap,
