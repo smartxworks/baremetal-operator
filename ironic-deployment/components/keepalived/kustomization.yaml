@@ -7,4 +7,4 @@ patchesStrategicMerge:
 configMapGenerator:
 - envs:
   - ironic_bmo_configmap.env
-  name: ironic-bmo-configmap
+  name: ironic

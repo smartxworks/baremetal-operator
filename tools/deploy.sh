@@ -11,6 +11,7 @@ function usage {
     echo "       -n: deploy without authentication"
     echo "       -k: deploy with keepalived"
     echo "       -m: deploy with mariadb (requires TLS enabled)"
+    echo "       -g: generate yaml instead of the apply to the k8s cluster"
 }
 
 DEPLOY_BMO=false
@@ -19,8 +20,9 @@ DEPLOY_TLS=false
 DEPLOY_BASIC_AUTH=true
 DEPLOY_KEEPALIVED=false
 DEPLOY_MARIADB=false
+GENERATE_YAML=false
 
-while getopts ":hbitnkm" options; do
+while getopts ":hbitnkmg" options; do
     case "${options}" in
         h)
             usage
@@ -44,6 +46,9 @@ while getopts ":hbitnkm" options; do
             ;;
         m)
             DEPLOY_MARIADB=true
+            ;;
+        g)
+            GENERATE_YAML=true
             ;;
         :)
             echo "ERROR: -${OPTARG} requires an argument"
@@ -134,6 +139,10 @@ else
     fi
 fi
 
+if [ "${DEPLOY_IRONIC}" != "true" ];then
+     ${KUSTOMIZE} edit add component ../../../config/configmap
+fi
+
 if [[ "${DEPLOY_KEEPALIVED}" == "true" ]]; then
     ${KUSTOMIZE} edit add component ../../components/keepalived
 fi
@@ -144,11 +153,11 @@ fi
 
 popd
 
-IRONIC_DATA_DIR="${IRONIC_DATA_DIR:-/opt/metal3/ironic/}"
+IRONIC_DATA_DIR="${IRONIC_DATA_DIR:-/tmp/metal3/ironic/}"
 IRONIC_AUTH_DIR="${IRONIC_AUTH_DIR:-"${IRONIC_DATA_DIR}auth/"}"
 
-sudo mkdir -p "${IRONIC_DATA_DIR}"
-sudo chown -R "${USER}:$(id -gn)" "${IRONIC_DATA_DIR}"
+mkdir -p "${IRONIC_DATA_DIR}"
+chown -R "${USER}:$(id -gn)" "${IRONIC_DATA_DIR}"
 mkdir -p "${IRONIC_AUTH_DIR}"
 
 # If usernames and passwords are unset, read them from file or generate them
@@ -210,7 +219,12 @@ fi
 if [[ "${DEPLOY_BMO}" == "true" ]]; then
     pushd "${SCRIPTDIR}"
     # shellcheck disable=SC2086
-    ${KUSTOMIZE} build "${BMO_SCENARIO}" | kubectl apply ${KUBECTL_ARGS} -f -
+    echo "generate bmo ..."
+    if [ "${GENERATE_YAML}" == true ];then
+        ${KUSTOMIZE} build "${BMO_SCENARIO}" > "${SCRIPTDIR}/manifests.yaml"
+    else
+        ${KUSTOMIZE} build "${BMO_SCENARIO}" | kubectl apply ${KUBECTL_ARGS} -f -
+    fi
     popd
 fi
 
@@ -226,26 +240,38 @@ if [[ "${DEPLOY_IRONIC}" == "true" ]]; then
     IRONIC_BMO_CONFIGMAP="${TEMP_IRONIC_OVERLAY}/ironic_bmo_configmap.env"
     cp "${IRONIC_BMO_CONFIGMAP_SOURCE}" "${IRONIC_BMO_CONFIGMAP}"
     if grep -q "INSPECTOR_REVERSE_PROXY_SETUP" "${IRONIC_BMO_CONFIGMAP}" ; then
-        sed "s/\(INSPECTOR_REVERSE_PROXY_SETUP\).*/\1=${DEPLOY_TLS}/" -i "${IRONIC_BMO_CONFIGMAP}"
+        sed -e "s/\(INSPECTOR_REVERSE_PROXY_SETUP\).*/\1=${DEPLOY_TLS}/" -i "${IRONIC_BMO_CONFIGMAP}"
     else
         echo "INSPECTOR_REVERSE_PROXY_SETUP=${DEPLOY_TLS}" >> "${IRONIC_BMO_CONFIGMAP}"
     fi
     if grep -q "RESTART_CONTAINER_CERTIFICATE_UPDATED" "${IRONIC_BMO_CONFIGMAP}" ; then
-        sed "s/\(RESTART_CONTAINER_CERTIFICATE_UPDATED\).*/\1=${RESTART_CONTAINER_CERTIFICATE_UPDATED}/" -i "${IRONIC_BMO_CONFIGMAP}"
+        sed -e "s/\(RESTART_CONTAINER_CERTIFICATE_UPDATED\).*/\1=${RESTART_CONTAINER_CERTIFICATE_UPDATED}/" -i "${IRONIC_BMO_CONFIGMAP}"
     else
         echo "RESTART_CONTAINER_CERTIFICATE_UPDATED=${RESTART_CONTAINER_CERTIFICATE_UPDATED}" >> "${IRONIC_BMO_CONFIGMAP}"
     fi
-    sed -i "s/IRONIC_HOST_IP/${IRONIC_HOST_IP}/g" "${SCRIPTDIR}/ironic-deployment/components/tls/certificate.yaml"
-    sed -i "s/MARIADB_HOST_IP/${MARIADB_HOST_IP}/g" "${SCRIPTDIR}/ironic-deployment/components/mariadb/certificate.yaml"
+    sed -ie "s/IRONIC_HOST_IP/${IRONIC_HOST_IP}/g" "${SCRIPTDIR}/ironic-deployment/components/tls/certificate.yaml"
+    sed -ie "s/MARIADB_HOST_IP/${MARIADB_HOST_IP}/g" "${SCRIPTDIR}/ironic-deployment/components/mariadb/certificate.yaml"
     # The keepalived component has its own configmap,
     # but we are overriding depending on environment here so we must replace it.
     if [[ "${DEPLOY_KEEPALIVED}" == "true" ]]; then
-        ${KUSTOMIZE} edit add configmap ironic-bmo-configmap --behavior=replace --from-env-file=ironic_bmo_configmap.env
+        ${KUSTOMIZE} edit add configmap ironic --behavior=replace --from-env-file=ironic_bmo_configmap.env --disableNameSuffixHash
     else
-        ${KUSTOMIZE} edit add configmap ironic-bmo-configmap --behavior=create --from-env-file=ironic_bmo_configmap.env
+        ${KUSTOMIZE} edit add configmap ironic --behavior=create --from-env-file=ironic_bmo_configmap.env --disableNameSuffixHash
     fi
     # shellcheck disable=SC2086
-    ${KUSTOMIZE} build "${TEMP_IRONIC_OVERLAY}" | kubectl apply ${KUBECTL_ARGS} -f -
+    pwd
+
+    echo "generate ironic"
+    if [ "${GENERATE_YAML}" == true ];then
+        if [ "${DEPLOY_BMO}" != "true" ];then
+            rm "${SCRIPTDIR}/manifests.yaml"
+        else
+            echo "---" >> "${SCRIPTDIR}/manifests.yaml"
+        fi
+        ${KUSTOMIZE} build "${TEMP_IRONIC_OVERLAY}" >> "${SCRIPTDIR}/manifests.yaml"
+    else
+        ${KUSTOMIZE} build "${TEMP_IRONIC_OVERLAY}" | kubectl apply ${KUBECTL_ARGS} -f -
+    fi
     popd
 fi
 

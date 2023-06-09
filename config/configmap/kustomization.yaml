@@ -1,0 +1,9 @@
+# Add ironic configmap-generator 
+generatorOptions:
+ disableNameSuffixHash: true
+ 
+configMapGenerator:
+- behavior: create
+  envs:
+  - ironic.env
+  name: baremetal-operator-ironic

@@ -59,7 +59,7 @@ spec:
           name: ironic-data-volume
         envFrom:
         - configMapRef:
-            name: ironic-bmo-configmap
+            name: ironic
       - name: ironic
         image: quay.io/metal3-io/ironic
         imagePullPolicy: Always
@@ -86,7 +86,7 @@ spec:
           name: ironic-data-volume
         envFrom:
         - configMapRef:
-            name: ironic-bmo-configmap
+            name: ironic
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -134,7 +134,7 @@ spec:
         - /bin/runironic-inspector
         envFrom:
         - configMapRef:
-            name: ironic-bmo-configmap
+            name: ironic
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -169,7 +169,7 @@ spec:
           name: ironic-data-volume
         envFrom:
         - configMapRef:
-            name: ironic-bmo-configmap
+            name: ironic
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -186,7 +186,7 @@ spec:
         - /usr/local/bin/get-resource.sh
         envFrom:
         - configMapRef:
-            name: ironic-bmo-configmap
+            name: ironic
         volumeMounts:
         - mountPath: /shared
           name: ironic-data-volume

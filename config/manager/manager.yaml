@@ -36,7 +36,7 @@ spec:
                   fieldPath: metadata.namespace
           envFrom:
             - configMapRef:
-                name: ironic
+                name: baremetal-operator-ironic
           name: manager
           securityContext:
             allowPrivilegeEscalation: false

@@ -13,7 +13,7 @@ spec:
         - secretRef:
             name: ironic-inspector-htpasswd
         - configMapRef:
-            name: ironic-bmo-configmap
+            name: ironic
         volumeMounts:
         - mountPath: /auth/ironic
           name: ironic-auth-config
