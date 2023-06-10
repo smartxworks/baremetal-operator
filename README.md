@@ -37,3 +37,14 @@ following command:
 
 This will render the `config/render/capm3.yaml`. Please do not change the
 content of `config/render/capm3.yaml` manually.
+
+
+### fork
+
+```sh
+# push current to smartx github
+git push -u smartx
+
+# pull origin
+git pull origin main
+```
