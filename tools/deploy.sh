@@ -21,6 +21,7 @@ DEPLOY_BASIC_AUTH=true
 DEPLOY_KEEPALIVED=false
 DEPLOY_MARIADB=false
 GENERATE_YAML=false
+: ${REGISTRY_URL:='quay.io/metal3-io'}
 
 while getopts ":hbitnkmg" options; do
     case "${options}" in
@@ -145,7 +146,7 @@ else
 fi
 
 if [ "${DEPLOY_IRONIC}" != "true" ];then
-     ${KUSTOMIZE} edit add component ../../../config/configmap
+    ${KUSTOMIZE} edit add component ../../../config/configmap
 fi
 
 if [[ "${DEPLOY_KEEPALIVED}" == "true" ]]; then
@@ -226,9 +227,9 @@ if [[ "${DEPLOY_BMO}" == "true" ]]; then
     # shellcheck disable=SC2086
     echo "generate bmo ..."
     if [ "${GENERATE_YAML}" == true ];then
-        ${KUSTOMIZE} build "${BMO_SCENARIO}" | sed "s/172.22.0.2/${IRONIC_HOST_IP}/g" > "${SCRIPTDIR}/manifests.yaml"
+        ${KUSTOMIZE} build "${BMO_SCENARIO}" | sed "s/172.22.0.2/${IRONIC_HOST_IP}/g" | sed "s|image: quay.io|image: ${REGISTRY_URL}|g" > "${SCRIPTDIR}/manifests.yaml"
     else
-        ${KUSTOMIZE} build "${BMO_SCENARIO}" | sed "s/172.22.0.2/${IRONIC_HOST_IP}/g" | kubectl apply ${KUBECTL_ARGS} -f -
+        ${KUSTOMIZE} build "${BMO_SCENARIO}" | sed "s/172.22.0.2/${IRONIC_HOST_IP}/g" | sed "s|image: quay.io|image: ${REGISTRY_URL}|g"| kubectl apply ${KUBECTL_ARGS} -f -
     fi
     popd
 fi
@@ -284,9 +285,9 @@ if [[ "${DEPLOY_IRONIC}" == "true" ]]; then
         else
             echo "---" >> "${SCRIPTDIR}/manifests.yaml"
         fi
-        ${KUSTOMIZE} build "${TEMP_IRONIC_OVERLAY}" >> "${SCRIPTDIR}/manifests.yaml"
+        ${KUSTOMIZE} build "${TEMP_IRONIC_OVERLAY}" | sed "s|image: quay.io|image: ${REGISTRY_URL}|g" >> "${SCRIPTDIR}/manifests.yaml"
     else
-        ${KUSTOMIZE} build "${TEMP_IRONIC_OVERLAY}" | kubectl apply ${KUBECTL_ARGS} -f -
+        ${KUSTOMIZE} build "${TEMP_IRONIC_OVERLAY}" | sed "s|image: quay.io|image: ${REGISTRY_URL}|g" | kubectl apply ${KUBECTL_ARGS} -f -
     fi
     popd
 fi
