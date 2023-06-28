@@ -258,6 +258,10 @@ if [[ "${DEPLOY_IRONIC}" == "true" ]]; then
 
     sed -ie "s/172.22.0.2/${IRONIC_HOST_IP}/g" "${IRONIC_BMO_CONFIGMAP}"
 
+    if [ -n "${DHCP_RANGE}" ];then
+        sed -ie "s#DHCP_RANGE=.*#DHCP_RANGE=${DHCP_RANGE}#g" "${IRONIC_BMO_CONFIGMAP}"
+    fi
+
     if [ -n "${PROVISIONING_INTERFACE}" ];then
         sed -ie "s/PROVISIONING_INTERFACE=.*/PROVISIONING_INTERFACE=${PROVISIONING_INTERFACE}/g" "${IRONIC_BMO_CONFIGMAP}"
     fi
